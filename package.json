@@ -1,0 +1,27 @@
+{
+  "name": "yotube-crawl",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "9",
+    "@types/bun": "latest",
+    "@types/node": "^22.14.0",
+    "eslint": "9",
+    "eslint-config-prettier": "9",
+    "eslint-plugin-prettier": "5",
+    "globals": "15",
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "8"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "dev": "bun run index.ts",
+    "build": "bun build index.ts --target=bun --outfile=dist/index.js",
+    "dev:node": "node --loader ts-node/esm --env-file=.env index.ts"
+  },
+  "imports": {
+    "#*": "./*"
+  }
+}
