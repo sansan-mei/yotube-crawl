@@ -6,6 +6,7 @@ declare type AnyObject = Record<string, any>;
 declare namespace NodeJS {
   interface ProcessEnv {
     key: string;
+    id: string;
   }
 }
 

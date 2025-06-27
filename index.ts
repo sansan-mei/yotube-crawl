@@ -2,6 +2,7 @@ import { writeFileSync } from "node:fs";
 
 const baseUrl = "https://youtube.googleapis.com/youtube/v3/commentThreads";
 const apiKey = process.env.key;
+const id = process.env.id;
 
 /**
  * 获取视频评论直到达到指定数量
@@ -11,7 +12,7 @@ const apiKey = process.env.key;
  * @returns 评论数组
  */
 const fetchCommentsUntilCount = async (
-  videoId: string = "khG5v425m-U",
+  videoId: string = id,
   targetCount: number = 12000,
   order: "relevance" | "time" = "relevance",
 ): Promise<IComment[]> => {
@@ -83,7 +84,7 @@ const fetchCommentsUntilCount = async (
     throw error;
   } finally {
     // 写入文件
-    writeFileSync("comments.json", JSON.stringify(comments, null, 2));
+    writeFileSync(`${id}:comments.json`, JSON.stringify(comments, null, 2));
   }
 };
 
