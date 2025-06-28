@@ -62,3 +62,81 @@ declare interface YouTubeCommentResponse {
     };
   }>;
 }
+
+declare interface IVideoInfo {
+  id: string;
+  title: string;
+  description: string;
+  channelId: string;
+  channelTitle: string;
+  publishedAt: string;
+  duration: string;
+  viewCount: string;
+  likeCount: string;
+  commentCount: string;
+  categoryId: string;
+  tags: string[];
+  thumbnails: {
+    default: IThumbnail;
+    medium: IThumbnail;
+    high: IThumbnail;
+    standard?: IThumbnail;
+    maxres?: IThumbnail;
+  };
+}
+
+declare interface IThumbnail {
+  url: string;
+  width: number;
+  height: number;
+}
+
+declare interface YouTubeVideoResponse {
+  kind: string;
+  etag: string;
+  items: Array<{
+    kind: string;
+    etag: string;
+    id: string;
+    snippet: {
+      publishedAt: string;
+      channelId: string;
+      title: string;
+      description: string;
+      thumbnails: {
+        default: IThumbnail;
+        medium: IThumbnail;
+        high: IThumbnail;
+        standard?: IThumbnail;
+        maxres?: IThumbnail;
+      };
+      channelTitle: string;
+      tags?: string[];
+      categoryId: string;
+      liveBroadcastContent: string;
+      localized: {
+        title: string;
+        description: string;
+      };
+    };
+    contentDetails: {
+      duration: string;
+      dimension: string;
+      definition: string;
+      caption: string;
+      licensedContent: boolean;
+      contentRating: AnyObject;
+      projection: string;
+    };
+    statistics: {
+      viewCount: string;
+      likeCount: string;
+      favoriteCount: string;
+      commentCount: string;
+    };
+  }>;
+  pageInfo: {
+    totalResults: number;
+    resultsPerPage: number;
+  };
+}
