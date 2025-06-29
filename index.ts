@@ -1,5 +1,12 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { normalize } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { join, normalize } from "node:path";
+import YTDlp from "yt-dlp-wrap";
 
 const baseUrl = "https://youtube.googleapis.com/youtube/v3/commentThreads";
 const videoBaseUrl = "https://youtube.googleapis.com/youtube/v3/videos";
@@ -44,6 +51,79 @@ const fetchCaptionsList = async (videoId: string = id): Promise<ICaption[]> => {
   } catch (error) {
     console.error("获取字幕列表失败:", error);
     return [];
+  }
+};
+
+/**
+ * 使用yt-dlp下载字幕内容
+ * @param videoId YouTube视频ID
+ * @param outputPath 输出目录
+ * @returns 字幕内容对象
+ */
+const downloadCaptionsWithYtDlp = async (
+  videoId: string = id,
+  outputPath: string,
+): Promise<Record<string, string>> => {
+  try {
+    console.log("正在使用yt-dlp下载字幕内容...");
+    const ytDlp = new YTDlp("./yt-dlp.exe");
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+    // 下载字幕文件，添加反检测参数
+    await ytDlp.execPromise([
+      videoUrl,
+      "--write-subs", // 下载手动字幕
+      "--write-auto-subs", // 下载自动生成字幕
+      "--sub-langs",
+      "en,zh,zh-CN,zh-TW,ja,ko", // 多语言
+      "--sub-format",
+      "srt", // SRT格式
+      "--skip-download", // 不下载视频
+      "--cookies-from-browser",
+      "chrome", // 使用Chrome浏览器的cookies
+      "--user-agent",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "--sleep-interval",
+      "1", // 请求间隔
+      "--max-sleep-interval",
+      "3", // 最大间隔
+      "-o",
+      `${outputPath}/${videoId}.%(ext)s`, // 输出文件名格式
+    ]);
+
+    // 读取下载的字幕文件
+    const captionContents: Record<string, string> = {};
+
+    try {
+      const files = readdirSync(outputPath).filter(
+        (file: string) => file.startsWith(videoId) && file.endsWith(".srt"),
+      );
+
+      for (const file of files) {
+        const filePath = join(outputPath, file);
+        const content = readFileSync(filePath, "utf-8");
+
+        // 从文件名提取语言代码
+        const langMatch = file.match(/\.([^.]+)\.srt$/);
+        const lang = langMatch ? langMatch[1] : "unknown";
+
+        captionContents[lang] = content;
+        console.log(`已下载字幕: ${lang} (${file})`);
+      }
+
+      console.log(`共下载了 ${Object.keys(captionContents).length} 个字幕文件`);
+    } catch (readError) {
+      console.warn("读取字幕文件时出错:", readError);
+    }
+
+    return captionContents;
+  } catch (error) {
+    console.error(
+      "yt-dlp下载字幕失败:",
+      error instanceof Error ? error.message : String(error),
+    );
+    console.log("提示：请确保已安装yt-dlp或yt-dlp-wrap能正常工作");
+    return {};
   }
 };
 
@@ -180,7 +260,7 @@ const fetchCommentsUntilCount = async (
 };
 
 /**
- * 获取完整的视频数据（包括基础信息、评论和字幕列表）
+ * 获取完整的视频数据（包括基础信息、评论、字幕列表和字幕内容）
  * @param videoId YouTube视频ID
  * @param targetCount 评论目标数量
  * @param order 评论排序方式
@@ -205,8 +285,14 @@ const fetchVideoData = async (
     // 获取评论
     const comments = await fetchCommentsUntilCount(videoId, targetCount, order);
 
-    // 获取字幕列表（仅列表，不下载内容）
+    // 获取字幕列表（YouTube API）
     const captions = await fetchCaptionsList(videoId);
+
+    // 使用yt-dlp下载字幕内容
+    const captionContents = await downloadCaptionsWithYtDlp(
+      videoId,
+      currentPath,
+    );
 
     // 保存视频基础信息到JSON文件
     const videoInfoPath = `${currentPath}/video_info.json`;
@@ -218,21 +304,36 @@ const fetchVideoData = async (
     writeFileSync(commentsPath, JSON.stringify(comments, null, 2));
     console.log(`评论已保存到: ${commentsPath}`);
 
-    // 保存字幕列表信息（不包含内容）
+    // 保存字幕列表信息
     const captionsPath = `${currentPath}/captions_list.json`;
     writeFileSync(captionsPath, JSON.stringify(captions, null, 2));
     console.log(`字幕列表已保存到: ${captionsPath}`);
+
+    // 保存字幕内容信息
+    if (Object.keys(captionContents).length > 0) {
+      const captionContentsPath = `${currentPath}/captions_content.json`;
+      writeFileSync(
+        captionContentsPath,
+        JSON.stringify(captionContents, null, 2),
+      );
+      console.log(`字幕内容已保存到: ${captionContentsPath}`);
+    }
 
     // 保存完整数据到一个文件
     const fullData = {
       videoInfo,
       comments,
       captions,
+      captionContents,
       metadata: {
         crawledAt: new Date().toISOString(),
         totalComments: comments.length,
         totalCaptions: captions.length,
-        note: "字幕列表仅包含信息，不含内容（需要OAuth认证）",
+        totalCaptionContents: Object.keys(captionContents).length,
+        captionSources: {
+          list: "YouTube Data API v3",
+          content: "yt-dlp",
+        },
       },
     };
 
@@ -243,8 +344,8 @@ const fetchVideoData = async (
     console.log(`视频标题: ${videoInfo.title}`);
     console.log(`评论数量: ${comments.length}`);
     console.log(`字幕轨道数量: ${captions.length}`);
+    console.log(`字幕内容数量: ${Object.keys(captionContents).length}`);
     console.log(`数据保存路径: ${currentPath}`);
-    console.log("\n注意：字幕内容需要OAuth认证，当前只获取了字幕列表信息");
   } catch (error) {
     console.error("获取视频数据失败:", error);
     throw error;
